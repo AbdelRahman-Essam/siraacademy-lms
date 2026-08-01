@@ -1,0 +1,43 @@
+############################
+# Python
+############################
+backend/venv/
+backend/__pycache__/
+backend/*/__pycache__/
+backend/**/*.pyc
+backend/db.sqlite3
+
+############################
+# Environment
+############################
+backend/.env
+frontend/.env
+
+############################
+# Django
+############################
+backend/media/
+backend/staticfiles/
+backend/static/
+
+############################
+# React / Node
+############################
+frontend/node_modules/
+frontend/dist/
+
+############################
+# VS Code
+############################
+.vscode/
+
+############################
+# Logs
+############################
+*.log
+
+############################
+# OS
+############################
+.DS_Store
+Thumbs.db
