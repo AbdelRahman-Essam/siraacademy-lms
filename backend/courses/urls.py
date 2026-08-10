@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    CourseListView, CourseDetailView, LessonVideoAccessView, VideoTokenVerifyView,
+    CourseListView, CourseCatalogView, CourseDetailView, LessonVideoAccessView, VideoTokenVerifyView,
     LessonDecryptionKeyView, TeacherMeetingLinkListView, TeacherMeetingLinkUpdateView,
     AdminCourseListCreateView, AdminCourseDetailView,
     AdminLessonListCreateView, AdminLessonDetailView,
@@ -10,6 +10,7 @@ from .views import (
 urlpatterns = [
     # Student-facing
     path('', CourseListView.as_view(), name='course-list'),
+    path('catalog/', CourseCatalogView.as_view(), name='course-catalog'),
     path('<int:pk>/', CourseDetailView.as_view(), name='course-detail'),
     path('lessons/<int:lesson_id>/video-token/', LessonVideoAccessView.as_view(), name='lesson-video-token'),
     path('lessons/<int:lesson_id>/verify-token/', VideoTokenVerifyView.as_view(), name='lesson-verify-token'),

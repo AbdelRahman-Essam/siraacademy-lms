@@ -11,9 +11,16 @@ class Enrollment(models.Model):
     are still locked. This is the server-side source of truth used by
     courses.views to decide access — never trust a client-sent value.
     """
+
+    class Source(models.TextChoices):
+        SELF = 'self', 'Self-enrolled'
+        ADMIN = 'admin', 'Enrolled by admin'
+        PURCHASE = 'purchase', 'Purchase order (future)'
+
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='enrollments')
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
     unlocked_lesson_order = models.PositiveIntegerField(default=1)
+    source = models.CharField(max_length=10, choices=Source.choices, default=Source.SELF)
     enrolled_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

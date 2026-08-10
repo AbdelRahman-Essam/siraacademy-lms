@@ -25,3 +25,17 @@ class TeacherEnrollmentSerializer(serializers.ModelSerializer):
             'id', 'student_username', 'student_email', 'course_title',
             'unlocked_lesson_order', 'total_lessons', 'enrolled_at',
         ]
+
+
+class AdminEnrollmentSerializer(serializers.ModelSerializer):
+    """Used on the Admin Dashboard's enroll-student panel — shows who
+    enrolled whom (source) alongside the usual progress info."""
+    student_username = serializers.CharField(source='student.username', read_only=True)
+    course_title = serializers.CharField(source='course.title', read_only=True)
+
+    class Meta:
+        model = Enrollment
+        fields = [
+            'id', 'student_username', 'course', 'course_title',
+            'unlocked_lesson_order', 'source', 'enrolled_at',
+        ]

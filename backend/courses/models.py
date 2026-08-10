@@ -4,6 +4,16 @@ from django.db import models
 class Course(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    thumbnail = models.ImageField(upload_to='course_thumbnails/', blank=True, null=True)
+    promo_video = models.FileField(
+        upload_to='course_promo_videos/', blank=True, null=True,
+        help_text="Short promotional clip shown on the public Courses catalog page"
+    )
+    price = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0,
+        help_text="Course price. Purchases aren't wired to a payment gateway yet — "
+                   "enrollment is admin-driven for now (see Enrollment.source)."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

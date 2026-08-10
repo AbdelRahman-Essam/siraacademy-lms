@@ -35,7 +35,7 @@ export default function TeacherGrading() {
       <h1 className="text-lg font-medium">Grade submissions</h1>
 
       {submissions.map((sub) => (
-        <div key={sub.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+        <div key={sub.id} className="paper-card p-4 space-y-3">
           <div className="flex justify-between items-center">
             <p className="text-sm font-medium">{sub.student_name}</p>
             <span
@@ -54,7 +54,7 @@ export default function TeacherGrading() {
           />
 
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Feedback</label>
+            <label className="block text-xs text-ink/50 mb-1">Feedback</label>
             <textarea
               className="w-full border rounded px-3 py-2 text-sm"
               rows={2}
@@ -65,7 +65,7 @@ export default function TeacherGrading() {
 
           <div className="flex items-end gap-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Grade</label>
+              <label className="block text-xs text-ink/50 mb-1">Grade</label>
               <input
                 className="border rounded px-3 py-1.5 text-sm w-24"
                 defaultValue={sub.grade}
@@ -83,7 +83,7 @@ export default function TeacherGrading() {
         </div>
       ))}
 
-      {submissions.length === 0 && <p className="text-sm text-gray-500">No submissions yet.</p>}
+      {submissions.length === 0 && <p className="text-sm text-ink/50">No submissions yet.</p>}
     </div>
   )
 }

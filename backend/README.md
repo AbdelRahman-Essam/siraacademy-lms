@@ -45,6 +45,7 @@ or via `python manage.py seed_demo` for ready-made demo accounts. `createsuperus
 | POST | `/api/auth/token/refresh/` | Refresh an expired access token | Public |
 | GET | `/api/auth/me/` | Current logged-in user profile | Authenticated |
 | GET | `/api/courses/` | List all courses | Authenticated |
+| GET | `/api/courses/catalog/` | Rich catalog: cost, thumbnail, promo video, enrollment status | Authenticated |
 | GET | `/api/courses/<id>/` | Course detail with per-lesson lock status + meeting link (if unlocked) | Authenticated |
 | GET | `/api/courses/lessons/<id>/video-token/` | Get signed token to play a lesson's video (403 if locked) | Authenticated |
 | GET | `/api/courses/lessons/<id>/verify-token/` | Internal: verify a video token (for a key server / nginx auth_request) | Public |
@@ -61,11 +62,75 @@ or via `python manage.py seed_demo` for ready-made demo accounts. `createsuperus
 | POST | `/api/enrollments/enroll/` | Enroll in a course | Authenticated |
 | POST | `/api/enrollments/<id>/unlock-next/` | Unlock the next lesson | Authenticated |
 | GET | `/api/enrollments/teacher/records/` | Read-only student progress records (`?course=<id>` optional) | Teacher/Admin |
+| POST | `/api/enrollments/admin/enroll/` | Enroll any student into a course by username | Admin only |
+| GET | `/api/enrollments/admin/list/` | List every enrollment platform-wide (`?course=<id>` optional) | Admin only |
+| DELETE | `/api/enrollments/admin/<id>/` | Remove a student's enrollment | Admin only |
 | GET | `/api/assignments/<id>/` | Get an assignment's prompt audio (403 if lesson locked) | Authenticated |
 | POST | `/api/assignments/submit/` | Submit final voice recording | Authenticated |
 | GET | `/api/assignments/me/` | My submissions + grades | Authenticated |
 | GET | `/api/assignments/review/` | List all submissions to grade | Teacher/Admin |
 | PATCH | `/api/assignments/review/<id>/` | Add feedback + grade | Teacher/Admin |
+| POST | `/api/payments/checkout/` | Start a Paymob checkout for a paid course | Authenticated |
+| POST | `/api/payments/webhook/` | Paymob's payment-confirmation callback (HMAC-verified) | Public (signed) |
+| GET | `/api/payments/me/` | My purchase history | Authenticated |
+| GET | `/api/payments/<id>/` | Poll a specific purchase's status | Authenticated |
+
+## Payments (Paymob) — Egyptian Pound checkout
+
+Paid courses go through a real Paymob "Accept" checkout — the classic
+3-step flow (auth token → order → payment key → iframe redirect) plus a
+webhook that confirms payment server-side before creating the enrollment.
+
+### Setup
+
+1. Create a Paymob account at [paymob.com](https://paymob.com) (or your
+   region's Accept portal) and complete verification.
+2. In the dashboard, get:
+   - **API key** — Settings → Account Info
+   - **Integration ID** — Developers → Payment Integrations (use your
+     "Online Card" / Accept integration)
+   - **Iframe ID** — Developers → iframes
+   - **HMAC secret** — Settings → Account Info
+3. Add them to `.env`:
+   ```
+   PAYMOB_API_KEY=...
+   PAYMOB_INTEGRATION_ID=...
+   PAYMOB_IFRAME_ID=...
+   PAYMOB_HMAC_SECRET=...
+   ```
+4. In the integration's settings on Paymob's dashboard, set:
+   - **Transaction processed callback** → `https://<your-domain>/api/payments/webhook/`
+   - **Transaction response callback** → `https://<your-frontend-domain>/payments/result`
+
+### ⚠️ Verify the HMAC field order before going live
+
+`payments/paymob.py`'s `verify_hmac()` recomputes Paymob's signature
+over an ordered list of transaction fields — this is what proves a
+webhook actually came from Paymob and wasn't forged. The field order
+implemented matches Paymob's long-documented "Transaction Processed
+Callback" list, but **payment-gateway APIs are exactly the kind of
+detail that can drift over time** — double-check the current field
+order against your Paymob dashboard's docs (Developers → Webhooks)
+before accepting real payments. Getting this wrong either accepts
+forged payment confirmations or silently rejects real ones.
+
+### Flow
+
+1. Student clicks "Purchase" on a paid course → `POST /api/payments/checkout/`
+2. Backend creates a `pending` `PurchaseOrder`, registers it with Paymob, returns an iframe URL
+3. Frontend redirects the browser to that iframe URL — student pays on Paymob's hosted page
+4. Paymob calls our webhook server-to-server → HMAC verified → `PurchaseOrder` marked `paid` → `Enrollment` created with `source='purchase'`
+5. Paymob also redirects the student's browser back to `/payments/result` — that page polls `GET /api/payments/<id>/` until the webhook has landed, since the redirect itself isn't proof of payment
+
+## Course commerce fields (enrollment roadmap)
+
+`Course` now has `thumbnail`, `promo_video`, and `price` — used by the
+public-style Courses catalog page. `Enrollment.source` distinguishes
+`self` (free courses, student clicked Enroll), `admin` (enrolled
+manually via the Admin Dashboard), and `purchase` (created automatically
+by the Paymob webhook — see the Payments section above).
+
+Requires `Pillow` (added to requirements.txt) for the thumbnail `ImageField`.
 
 ## Demo data
 

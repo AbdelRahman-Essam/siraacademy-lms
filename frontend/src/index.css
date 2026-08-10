@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-body text-ink bg-parchment;
+  }
+  h1, h2, h3 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  /* A hairline gold rule under section headings — the recurring
+     "certificate" motif that ties every page back to the seal logo. */
+  .brass-rule {
+    @apply block w-10 h-px bg-brass mt-2;
+  }
+
+  /* Card style used throughout: quiet paper surface with a fine border,
+     standing in for the generic drop-shadow card. */
+  .paper-card {
+    @apply bg-white border border-brand/10 rounded-lg shadow-sm;
+  }
+}

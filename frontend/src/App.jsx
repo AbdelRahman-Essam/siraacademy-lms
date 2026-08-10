@@ -8,6 +8,8 @@ import AdminLayout from './components/AdminLayout'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
+import Courses from './pages/Courses'
+import PaymentResult from './pages/PaymentResult'
 import CourseDetail from './pages/CourseDetail'
 import TeacherLiveSessions from './pages/teacher/TeacherLiveSessions'
 import TeacherRecords from './pages/teacher/TeacherRecords'
@@ -27,6 +29,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/courses"
+            element={
+              <ProtectedRoute>
+                <Courses />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments/result"
+            element={
+              <ProtectedRoute>
+                <PaymentResult />
               </ProtectedRoute>
             }
           />

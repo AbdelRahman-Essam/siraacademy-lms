@@ -35,19 +35,19 @@ export default function TeacherLiveSessions() {
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-medium">Live session links</h1>
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-ink/50">
         Set the Zoom/Google Meet link for each lesson's live session. Video content and
         course structure are managed by an admin.
       </p>
 
       {lessons.map((lesson) => (
-        <div key={lesson.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+        <div key={lesson.id} className="paper-card p-4 space-y-3">
           <p className="text-sm font-medium">
             {lesson.course_title} — {lesson.order}. {lesson.title}
           </p>
 
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Live session meeting link</label>
+            <label className="block text-xs text-ink/50 mb-1">Live session meeting link</label>
             <input
               className="w-full border rounded px-3 py-1.5 text-sm"
               value={lesson.meeting_link || ''}

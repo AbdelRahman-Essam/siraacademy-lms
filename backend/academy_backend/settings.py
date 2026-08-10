@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'courses',
     'enrollments',
     'assignments',
+    'payments',
 ]
 
 MIDDLEWARE = [
@@ -126,6 +127,16 @@ CORS_ALLOWED_ORIGINS = config(
 # ── Media files (video segments, audio submissions) ──────────────
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# ── Paymob (Egyptian payment gateway) ─────────────────────────────
+# Get these from your Paymob dashboard: API key (Settings > Account
+# Info), integration ID (Developers > Payment Integrations — use the
+# "Online Card" or "Accept" integration you set up), iframe ID
+# (Developers > iframes), and HMAC secret (Settings > Account Info).
+PAYMOB_API_KEY = config('PAYMOB_API_KEY', default='')
+PAYMOB_INTEGRATION_ID = config('PAYMOB_INTEGRATION_ID', default='')
+PAYMOB_IFRAME_ID = config('PAYMOB_IFRAME_ID', default='')
+PAYMOB_HMAC_SECRET = config('PAYMOB_HMAC_SECRET', default='')
 
 STATIC_URL = 'static/'
 

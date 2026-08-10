@@ -19,6 +19,9 @@ urlpatterns = [
 
     # Listening & speaking homework
     path('api/assignments/', include('assignments.urls')),
+
+    # Payments (Paymob checkout + webhook)
+    path('api/payments/', include('payments.urls')),
 ]
 
 if settings.DEBUG:

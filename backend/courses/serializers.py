@@ -83,7 +83,8 @@ class AdminCourseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'description', 'created_at', 'lessons']
+        fields = ['id', 'title', 'description', 'thumbnail', 'promo_video', 'price',
+                  'created_at', 'lessons']
         read_only_fields = ['created_at']
 
 
@@ -92,4 +93,25 @@ class CourseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'description', 'lessons']
+        fields = ['id', 'title', 'description', 'thumbnail', 'promo_video', 'price', 'lessons']
+
+
+class CourseCatalogSerializer(serializers.ModelSerializer):
+    """
+    Lightweight version for the public Courses catalog page — cost,
+    thumbnail ("offer photo"), and promo video per course, plus whether
+    the current student is already enrolled. No lesson content at all.
+    """
+    is_enrolled = serializers.SerializerMethodField()
+    lesson_count = serializers.IntegerField(source='lessons.count', read_only=True)
+
+    class Meta:
+        model = Course
+        fields = ['id', 'title', 'description', 'thumbnail', 'promo_video', 'price',
+                  'lesson_count', 'is_enrolled']
+
+    def get_is_enrolled(self, obj):
+        student = self.context.get('student')
+        if not student:
+            return False
+        return obj.enrollments.filter(student=student).exists()

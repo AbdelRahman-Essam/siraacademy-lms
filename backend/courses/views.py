@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from accounts.permissions import IsAdmin, IsTeacherOrAdmin
 from .models import Course, Lesson, Attachment
 from .serializers import (
-    CourseSerializer, TeacherMeetingLinkSerializer,
+    CourseSerializer, CourseCatalogSerializer, TeacherMeetingLinkSerializer,
     AdminCourseSerializer, AdminLessonSerializer, AttachmentSerializer,
 )
 from enrollments.models import Enrollment
@@ -44,6 +44,23 @@ class CourseListView(generics.ListAPIView):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+
+class CourseCatalogView(generics.ListAPIView):
+    """
+    GET /api/courses/catalog/
+    The "Courses" page: every course with cost, thumbnail ("offer
+    photo"), and promo video — plus whether the current student is
+    already enrolled, so the frontend can show Enroll vs. Continue.
+    """
+    queryset = Course.objects.all()
+    serializer_class = CourseCatalogSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['student'] = self.request.user
+        return context
 
 
 class CourseDetailView(generics.RetrieveAPIView):

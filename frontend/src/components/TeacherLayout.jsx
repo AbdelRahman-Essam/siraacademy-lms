@@ -12,8 +12,8 @@ export default function TeacherLayout() {
   const { logout } = useAuth()
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex justify-between items-center">
+    <div className="min-h-screen bg-parchment">
+      <header className="bg-white border-b border-brand/10 px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-6">
           <Logo size={32} />
           <nav className="flex gap-1">
@@ -22,7 +22,7 @@ export default function TeacherLayout() {
                 key={tab.to}
                 to={tab.to}
                 className={({ isActive }) =>
-                  `text-sm px-3 py-1.5 rounded ${isActive ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`
+                  `text-sm px-3 py-1.5 rounded ${isActive ? 'bg-brand text-white' : 'text-ink/60 hover:bg-parchment-dark'}`
                 }
               >
                 {tab.label}
@@ -30,7 +30,7 @@ export default function TeacherLayout() {
             ))}
           </nav>
         </div>
-        <button onClick={logout} className="text-sm underline">Log out</button>
+        <button onClick={logout} className="text-sm underline text-ink/60">Log out</button>
       </header>
 
       <main className="max-w-4xl mx-auto p-6">

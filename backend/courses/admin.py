@@ -15,7 +15,8 @@ class AttachmentInline(admin.TabularInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ['title', 'created_at']
+    list_display = ['title', 'price', 'created_at']
+    fields = ['title', 'description', 'thumbnail', 'promo_video', 'price']
     inlines = [LessonInline]
 
 
