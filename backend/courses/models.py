@@ -1,4 +1,6 @@
-from django.core.validators import FileExtensionValidator
+from decimal import Decimal, ROUND_HALF_UP
+
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 from .validators import validate_file_size
 
@@ -24,10 +26,25 @@ class Course(models.Model):
         help_text="Course price. Purchases aren't wired to a payment gateway yet — "
                    "enrollment is admin-driven for now (see Enrollment.source)."
     )
+    discount_percent = models.PositiveIntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Percentage off the price shown/charged to students (0–100). "
+                   "0 means no discount.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
+
+    @property
+    def final_price(self):
+        """Price after discount_percent is applied, rounded to cents.
+        This is the amount actually charged at checkout (see payments.views.CheckoutView)."""
+        if not self.discount_percent:
+            return self.price
+        discounted = self.price * (Decimal(100) - self.discount_percent) / Decimal(100)
+        return discounted.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
 class Lesson(models.Model):

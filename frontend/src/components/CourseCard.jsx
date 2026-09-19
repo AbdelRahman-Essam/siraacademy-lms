@@ -11,6 +11,8 @@ function resolveUrl(path) {
 export default function CourseCard({ course, onEnroll, enrolling }) {
   const thumbnail = resolveUrl(course.thumbnail)
   const promoVideo = resolveUrl(course.promo_video)
+  const hasDiscount = Number(course.discount_percent) > 0 && Number(course.price) > 0
+  const finalPrice = course.final_price ?? course.price
 
   return (
     <div className="paper-card overflow-hidden flex flex-col">
@@ -39,8 +41,25 @@ export default function CourseCard({ course, onEnroll, enrolling }) {
           </a>
         )}
 
-        <span className="absolute top-3 right-3 bg-white/95 text-brand text-sm font-medium px-2.5 py-1 rounded font-mono">
-          {Number(course.price) > 0 ? `${course.price} EGP` : 'Free'}
+        {hasDiscount && (
+          <span className="absolute top-3 left-3 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
+            -{course.discount_percent}%
+          </span>
+        )}
+
+        <span className="absolute top-3 right-3 bg-white/95 text-brand text-sm font-medium px-2.5 py-1 rounded font-mono flex items-center gap-1.5">
+          {Number(course.price) > 0 ? (
+            hasDiscount ? (
+              <>
+                <span className="line-through text-ink/40 font-normal">{course.price}</span>
+                <span>{finalPrice} EGP</span>
+              </>
+            ) : (
+              `${course.price} EGP`
+            )
+          ) : (
+            'Free'
+          )}
         </span>
       </div>
 
@@ -66,7 +85,7 @@ export default function CourseCard({ course, onEnroll, enrolling }) {
           >
             {enrolling
               ? Number(course.price) > 0 ? 'Redirecting to payment...' : 'Enrolling...'
-              : Number(course.price) > 0 ? `Purchase for ${course.price} EGP` : 'Enroll now'}
+              : Number(course.price) > 0 ? `Purchase for ${finalPrice} EGP` : 'Enroll now'}
           </button>
         )}
       </div>

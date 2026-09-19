@@ -38,7 +38,7 @@ function CoursesAndLessons() {
   const [courses, setCourses] = useState([])
   const [selectedCourseId, setSelectedCourseId] = useState(null)
 
-  const [newCourse, setNewCourse] = useState({ title: '', description: '', price: '0' })
+  const [newCourse, setNewCourse] = useState({ title: '', description: '', price: '0', discount_percent: '0' })
   const [newThumbnail, setNewThumbnail] = useState(null)
   const [newPromoVideo, setNewPromoVideo] = useState(null)
   const [addingCourse, setAddingCourse] = useState(false)
@@ -65,13 +65,14 @@ function CoursesAndLessons() {
       formData.append('title', newCourse.title)
       formData.append('description', newCourse.description)
       formData.append('price', newCourse.price || '0')
+      formData.append('discount_percent', newCourse.discount_percent || '0')
       if (newThumbnail) formData.append('thumbnail', newThumbnail)
       if (newPromoVideo) formData.append('promo_video', newPromoVideo)
 
       const { data } = await client.post('/courses/admin/courses/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      setNewCourse({ title: '', description: '', price: '0' })
+      setNewCourse({ title: '', description: '', price: '0', discount_percent: '0' })
       setNewThumbnail(null)
       setNewPromoVideo(null)
       loadCourses()
@@ -123,7 +124,8 @@ function CoursesAndLessons() {
             >
               {course.title}
               <span className={`block text-xs ${selectedCourseId === course.id ? 'text-white/70' : 'text-ink/40'}`}>
-                {course.lessons.length} lesson{course.lessons.length !== 1 ? 's' : ''} · ${course.price}
+                {course.lessons.length} lesson{course.lessons.length !== 1 ? 's' : ''} · {course.price} EGP
+                {Number(course.discount_percent) > 0 && ` (-${course.discount_percent}%)`}
               </span>
             </button>
           ))}
@@ -145,16 +147,30 @@ function CoursesAndLessons() {
             value={newCourse.description}
             onChange={(e) => setNewCourse((p) => ({ ...p, description: e.target.value }))}
           />
-          <div>
-            <label className="block text-xs text-ink/50 mb-1">Price ($)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="w-full border border-ink/15 rounded px-3 py-1.5 text-sm"
-              value={newCourse.price}
-              onChange={(e) => setNewCourse((p) => ({ ...p, price: e.target.value }))}
-            />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-ink/50 mb-1">Price (EGP)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full border border-ink/15 rounded px-3 py-1.5 text-sm"
+                value={newCourse.price}
+                onChange={(e) => setNewCourse((p) => ({ ...p, price: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-ink/50 mb-1">Discount (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                className="w-full border border-ink/15 rounded px-3 py-1.5 text-sm"
+                value={newCourse.discount_percent}
+                onChange={(e) => setNewCourse((p) => ({ ...p, discount_percent: e.target.value }))}
+              />
+            </div>
           </div>
           <div>
             <label className="block text-xs text-ink/50 mb-1">Thumbnail photo</label>
@@ -203,6 +219,8 @@ function CoursesAndLessons() {
               </button>
             </div>
 
+            <CourseDetailsEditor course={selectedCourse} onChanged={loadCourses} />
+
             {selectedCourse.lessons
               .slice()
               .sort((a, b) => a.order - b.order)
@@ -241,6 +259,149 @@ function CoursesAndLessons() {
           </>
         )}
       </section>
+    </div>
+  )
+}
+
+// ── Course details: price, discount, thumbnail, intro video ────────
+
+function CourseDetailsEditor({ course, onChanged }) {
+  const [fields, setFields] = useState({
+    price: course.price ?? '0',
+    discount_percent: course.discount_percent ?? '0',
+  })
+  const [thumbnailFile, setThumbnailFile] = useState(null)
+  const [promoVideoFile, setPromoVideoFile] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Keep fields in sync if a different course is selected.
+  useEffect(() => {
+    setFields({ price: course.price ?? '0', discount_percent: course.discount_percent ?? '0' })
+    setThumbnailFile(null)
+    setPromoVideoFile(null)
+  }, [course.id])
+
+  function update(field, value) {
+    setFields((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const currentThumbnail = course.thumbnail
+    ? (course.thumbnail.startsWith('http') ? course.thumbnail : `${MEDIA_BASE}${course.thumbnail}`)
+    : null
+  const currentPromoVideo = course.promo_video
+    ? (course.promo_video.startsWith('http') ? course.promo_video : `${MEDIA_BASE}${course.promo_video}`)
+    : null
+
+  const priceNum = Number(fields.price) || 0
+  const discountNum = Number(fields.discount_percent) || 0
+  const previewFinalPrice = (priceNum * (100 - discountNum) / 100).toFixed(2)
+
+  async function save() {
+    setSaving(true)
+    try {
+      const formData = new FormData()
+      formData.append('price', fields.price || '0')
+      formData.append('discount_percent', fields.discount_percent || '0')
+      if (thumbnailFile) formData.append('thumbnail', thumbnailFile)
+      if (promoVideoFile) formData.append('promo_video', promoVideoFile)
+
+      await client.patch(`/courses/admin/courses/${course.id}/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setThumbnailFile(null)
+      setPromoVideoFile(null)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+      onChanged()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="paper-card p-4 space-y-3">
+      <p className="text-sm font-medium text-ink">Price, discount & media</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-ink/50 mb-1">Price (EGP)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            className="w-full border border-ink/15 rounded px-3 py-1.5 text-sm"
+            value={fields.price}
+            onChange={(e) => update('price', e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-ink/50 mb-1">Discount (%)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            className="w-full border border-ink/15 rounded px-3 py-1.5 text-sm"
+            value={fields.discount_percent}
+            onChange={(e) => update('discount_percent', e.target.value)}
+          />
+        </div>
+      </div>
+
+      {priceNum > 0 && (
+        <p className="text-xs text-ink/50">
+          Student pays:{' '}
+          {discountNum > 0 ? (
+            <>
+              <span className="line-through mr-1">{priceNum.toFixed(2)} EGP</span>
+              <span className="font-medium text-ink">{previewFinalPrice} EGP</span>
+            </>
+          ) : (
+            <span className="font-medium text-ink">{previewFinalPrice} EGP</span>
+          )}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-ink/50 mb-1">Thumbnail photo</label>
+          {currentThumbnail && !thumbnailFile && (
+            <img src={currentThumbnail} alt="Current thumbnail" className="w-full h-20 object-cover rounded mb-1" />
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            className="w-full text-xs"
+            onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-ink/50 mb-1">Intro / promo video</label>
+          {currentPromoVideo && !promoVideoFile && (
+            <a href={currentPromoVideo} target="_blank" rel="noreferrer" className="block text-xs underline text-brand mb-1 truncate">
+              View current video
+            </a>
+          )}
+          <input
+            type="file"
+            accept="video/*"
+            className="w-full text-xs"
+            onChange={(e) => setPromoVideoFile(e.target.files?.[0] || null)}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="bg-brand hover:bg-brand-light text-white rounded px-4 py-1.5 text-sm"
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+        {saved && <span className="text-sm text-green-700">Saved ✓</span>}
+      </div>
     </div>
   )
 }

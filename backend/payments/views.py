@@ -46,7 +46,7 @@ class CheckoutView(APIView):
             student=request.user, course=course, status=PurchaseOrder.Status.PENDING,
         ).delete()
 
-        amount_cents = int(course.price * 100)
+        amount_cents = int(course.final_price * 100)
         order = PurchaseOrder.objects.create(
             student=request.user, course=course, amount_cents=amount_cents,
         )

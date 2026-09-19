@@ -120,20 +120,23 @@ class AdminCourseSerializer(serializers.ModelSerializer):
     """Full read/write access for admins — create/edit/delete courses,
     with nested lessons for the single-dashboard course+lesson view."""
     lessons = AdminLessonSerializer(many=True, read_only=True)
+    final_price = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
 
     class Meta:
         model = Course
         fields = ['id', 'title', 'description', 'thumbnail', 'promo_video', 'price',
-                  'created_at', 'lessons']
+                  'discount_percent', 'final_price', 'created_at', 'lessons']
         read_only_fields = ['created_at']
 
 
 class CourseSerializer(serializers.ModelSerializer):
     lessons = LessonPublicSerializer(many=True, read_only=True)
+    final_price = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'description', 'thumbnail', 'promo_video', 'price', 'lessons']
+        fields = ['id', 'title', 'description', 'thumbnail', 'promo_video', 'price',
+                  'discount_percent', 'final_price', 'lessons']
 
 
 class CourseCatalogSerializer(serializers.ModelSerializer):
@@ -141,14 +144,17 @@ class CourseCatalogSerializer(serializers.ModelSerializer):
     Lightweight version for the public Courses catalog page — cost,
     thumbnail ("offer photo"), and promo video per course, plus whether
     the current student is already enrolled. No lesson content at all.
+    `final_price` is the price after discount_percent — what's actually
+    charged at checkout (see payments.views.CheckoutView).
     """
     is_enrolled = serializers.SerializerMethodField()
     lesson_count = serializers.IntegerField(source='lessons.count', read_only=True)
+    final_price = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
 
     class Meta:
         model = Course
         fields = ['id', 'title', 'description', 'thumbnail', 'promo_video', 'price',
-                  'lesson_count', 'is_enrolled']
+                  'discount_percent', 'final_price', 'lesson_count', 'is_enrolled']
 
     def get_is_enrolled(self, obj):
         student = self.context.get('student')

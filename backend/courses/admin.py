@@ -15,8 +15,12 @@ class AttachmentInline(admin.TabularInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ['title', 'price', 'created_at']
-    fields = ['title', 'description', 'thumbnail', 'promo_video', 'price']
+    list_display = ['title', 'price', 'discount_percent', 'final_price', 'created_at']
+    fields = ['title', 'description', 'thumbnail', 'promo_video', 'price', 'discount_percent', 'final_price']
+    readonly_fields = ['final_price']
+
+    def final_price(self, obj):
+        return obj.final_price
     inlines = [LessonInline]
 
 
