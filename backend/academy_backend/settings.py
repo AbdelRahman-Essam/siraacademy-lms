@@ -23,6 +23,24 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     "https://siraacademy.duckdns.org",
 ]
+
+# ── Production hardening (no-ops in DEBUG so local dev isn't affected) ──
+# These matter once this sits behind Cloudflare Tunnel / nginx with real
+# HTTPS. Without them: cookies/headers could be sent over plain HTTP,
+# and the site could be framed by another page (clickjacking).
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    X_FRAME_OPTIONS = "DENY"
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Cloudflare Tunnel terminates TLS in front of us and forwards plain
+    # HTTP — without this, Django thinks every request is insecure and
+    # SECURE_SSL_REDIRECT loops forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # ── Applications ──────────────────────────────────────────────────
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -109,6 +127,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_THROTTLE_RATES': {
         'auth': '10/min',  # applied to login/register — slows down brute-force guessing
+        'checkout': '5/min',  # applied to payment checkout — prevents Paymob API abuse/spam
     },
 }
 

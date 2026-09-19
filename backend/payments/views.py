@@ -23,6 +23,7 @@ class CheckoutView(APIView):
     only created once the webhook confirms payment — never here.
     """
     permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = 'checkout'
 
     def post(self, request):
         course = Course.objects.filter(id=request.data.get('course_id')).first()
@@ -37,6 +38,13 @@ class CheckoutView(APIView):
                 {'detail': 'This course is free — use the self-enroll endpoint instead.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Clean up any earlier abandoned attempts (e.g. student opened
+        # checkout, closed the tab, came back and clicked Purchase again)
+        # so pending orders don't pile up indefinitely.
+        PurchaseOrder.objects.filter(
+            student=request.user, course=course, status=PurchaseOrder.Status.PENDING,
+        ).delete()
 
         amount_cents = int(course.price * 100)
         order = PurchaseOrder.objects.create(

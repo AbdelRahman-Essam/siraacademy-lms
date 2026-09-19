@@ -143,6 +143,49 @@ Creates `admin` / `Admin123!` (superuser), teachers `emma` / `james` (password
 `Teacher123!`), and 6 demo students (password `Student123!`) already enrolled
 with varying progress, plus sample assignments and graded submissions.
 
+## Testing
+
+A basic test suite covers the two most security-sensitive areas —
+nothing exhaustive, but it locks down the invariants that actually
+matter:
+
+```bash
+python manage.py test
+```
+
+- **`courses/tests.py`** — a student can never get a video token/decryption
+  key for a locked lesson, a token for one lesson can't be reused on
+  another, a tampered token is rejected, and teachers genuinely cannot
+  reach any content-management endpoint (verified by asserting `content_url`/
+  encryption keys never even appear in the teacher-facing response, not
+  just that the fields are blank)
+- **`payments/tests.py`** — checkout refuses free/already-enrolled courses,
+  cleans up abandoned pending orders, and marks orders `failed` if the
+  Paymob API call itself errors; the webhook rejects a missing HMAC, a
+  forged HMAC, and one signed with the wrong secret, only creates the
+  enrollment on a genuinely successful (non-voided, non-refunded)
+  transaction, and is idempotent if Paymob retries delivery
+- **`enrollments/tests.py`** — self-enroll rejects paid courses (the guard
+  against bypassing checkout), admin-enroll is admin-only, and a student
+  can't unlock another student's enrollment by guessing its id
+
+Uses `force_authenticate()` rather than real JWTs — standard DRF testing
+practice, doesn't weaken what's being tested since auth itself isn't
+what these tests are checking. Needs a real Postgres available for the
+test runner to create/drop its `test_` database (same credentials as
+`.env`); no SQLite fallback is configured.
+
+## Code review fixes (latest pass)
+
+Found and fixed while reviewing the pushed repo:
+- **No production security settings** — `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, HSTS, etc. now activate automatically when `DEBUG=False`, including `SECURE_PROXY_SSL_HEADER` for sitting behind Cloudflare Tunnel
+- **Checkout had no rate limiting** — added a `checkout: 5/min` throttle scope so `/api/payments/checkout/` can't be hammered to spam Paymob's API
+- **Abandoned checkouts piled up** — `CheckoutView` now clears a student's earlier `pending` orders for the same course before creating a new one
+- **Duplicate lesson order caused a raw 500** — `AdminLessonSerializer` now validates order uniqueness within a course itself and returns a clean 400 instead of an `IntegrityError`
+- **No file type/size limits anywhere** — `Course.thumbnail`/`promo_video` now validate extension + size (5MB / 200MB); `AttachmentSerializer` validates extension + size per `kind` (photo/video/document), since that one field accepts several file types. Nothing previously stopped an oversized file or a renamed executable from being uploaded.
+
+Run `python manage.py makemigrations` after pulling — the new file validators don't change the DB schema, but Django tracks them in migration state.
+
 ## Not yet implemented (next steps)
 
 - nginx-level integration of `LessonDecryptionKeyView` for real segment

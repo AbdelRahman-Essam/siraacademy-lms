@@ -60,6 +60,31 @@ class AttachmentSerializer(serializers.ModelSerializer):
         fields = ['id', 'lesson', 'file', 'kind', 'original_filename', 'uploaded_at']
         read_only_fields = ['uploaded_at']
 
+    # One field accepts video/photo/document depending on `kind`, so the
+    # extension/size check has to happen here rather than as a fixed
+    # FileField validator — otherwise nothing stops a 2GB file or a
+    # renamed executable from being uploaded as an "attachment".
+    ALLOWED_EXTENSIONS = {
+        Attachment.Kind.PHOTO: (['jpg', 'jpeg', 'png', 'webp'], 5),
+        Attachment.Kind.VIDEO: (['mp4', 'mov', 'webm'], 500),
+        Attachment.Kind.DOCUMENT: (['pdf', 'doc', 'docx', 'ppt', 'pptx'], 20),
+        Attachment.Kind.OTHER: (['pdf', 'jpg', 'jpeg', 'png', 'webp', 'zip'], 20),
+    }
+
+    def validate(self, data):
+        file = data.get('file')
+        kind = data.get('kind', Attachment.Kind.OTHER)
+        if file:
+            extensions, max_mb = self.ALLOWED_EXTENSIONS.get(kind, ([], 20))
+            ext = file.name.rsplit('.', 1)[-1].lower() if '.' in file.name else ''
+            if extensions and ext not in extensions:
+                raise serializers.ValidationError(
+                    {'file': f"'.{ext}' isn't allowed for kind={kind}. Allowed: {', '.join(extensions)}"}
+                )
+            if file.size > max_mb * 1024 * 1024:
+                raise serializers.ValidationError({'file': f"File too large — max {max_mb}MB for kind={kind}."})
+        return data
+
 
 class AdminLessonSerializer(serializers.ModelSerializer):
     """
@@ -74,6 +99,21 @@ class AdminLessonSerializer(serializers.ModelSerializer):
         model = Lesson
         fields = ['id', 'course', 'title', 'order', 'content_url', 'meeting_link',
                   'encryption_key_id', 'encryption_key', 'attachments']
+
+    def validate(self, data):
+        # Lesson.Meta.unique_together would otherwise surface as a raw
+        # 500 IntegrityError — catch it here for a clean 400 instead.
+        course = data.get('course') or getattr(self.instance, 'course', None)
+        order = data.get('order') or getattr(self.instance, 'order', None)
+        if course and order:
+            clash = Lesson.objects.filter(course=course, order=order)
+            if self.instance:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise serializers.ValidationError(
+                    {'order': f"Lesson {order} already exists for this course."}
+                )
+        return data
 
 
 class AdminCourseSerializer(serializers.ModelSerializer):

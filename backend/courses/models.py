@@ -1,13 +1,23 @@
+from django.core.validators import FileExtensionValidator
 from django.db import models
+from .validators import validate_file_size
+
+IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
+VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'm3u8']
+DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx']
 
 
 class Course(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    thumbnail = models.ImageField(upload_to='course_thumbnails/', blank=True, null=True)
+    thumbnail = models.ImageField(
+        upload_to='course_thumbnails/', blank=True, null=True,
+        validators=[FileExtensionValidator(IMAGE_EXTENSIONS), validate_file_size(5)],
+    )
     promo_video = models.FileField(
         upload_to='course_promo_videos/', blank=True, null=True,
-        help_text="Short promotional clip shown on the public Courses catalog page"
+        help_text="Short promotional clip shown on the public Courses catalog page",
+        validators=[FileExtensionValidator(VIDEO_EXTENSIONS), validate_file_size(200)],
     )
     price = models.DecimalField(
         max_digits=8, decimal_places=2, default=0,
