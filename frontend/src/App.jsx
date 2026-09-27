@@ -1,90 +1,32 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
-import ProtectedRoute from './components/ProtectedRoute'
-import TeacherRoute from './components/TeacherRoute'
-import TeacherLayout from './components/TeacherLayout'
-import AdminRoute from './components/AdminRoute'
-import AdminLayout from './components/AdminLayout'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import Courses from './pages/Courses'
-import PaymentResult from './pages/PaymentResult'
-import CourseDetail from './pages/CourseDetail'
-import TeacherLiveSessions from './pages/teacher/TeacherLiveSessions'
-import TeacherRecords from './pages/teacher/TeacherRecords'
-import TeacherGrading from './pages/teacher/TeacherGrading'
-import AdminDashboard from './pages/admin/AdminDashboard'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar/Navbar";
+import Footer from "./components/Footer/Footer";
+import Login from "./components/Auth/Login";
+import UploadProgressBar from "./components/Admin/UploadProgressBar";
+
+// Pages beyond Login (Courses catalog, CourseDetail, Dashboard, Admin tabs,
+// TeacherPanel, PaymentResult) follow the same pattern as Login/CourseCard
+// above — left to be filled in as this scaffold is built out further.
+
+function Placeholder({ title }) {
+  return <div className="p-10 text-center text-ink/60">{title} — page to be wired up</div>;
+}
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <Navbar />
+      <main className="min-h-[70vh]">
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Placeholder title="Home" />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/courses"
-            element={
-              <ProtectedRoute>
-                <Courses />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payments/result"
-            element={
-              <ProtectedRoute>
-                <PaymentResult />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/courses/:courseId"
-            element={
-              <ProtectedRoute>
-                <CourseDetail />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Teacher — meeting links, student records, grading. NO content access. */}
-          <Route
-            path="/teacher"
-            element={
-              <TeacherRoute>
-                <TeacherLayout />
-              </TeacherRoute>
-            }
-          >
-            <Route index element={<Navigate to="live-sessions" replace />} />
-            <Route path="live-sessions" element={<TeacherLiveSessions />} />
-            <Route path="records" element={<TeacherRecords />} />
-            <Route path="grading" element={<TeacherGrading />} />
-          </Route>
-
-          {/* Admin — full course/lesson management + media uploads, single dashboard. */}
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
-                <AdminLayout />
-              </AdminRoute>
-            }
-          >
-            <Route index element={<AdminDashboard />} />
-          </Route>
+          <Route path="/courses" element={<Placeholder title="Courses catalog" />} />
+          <Route path="/dashboard" element={<Placeholder title="My Courses" />} />
+          <Route path="/admin" element={<UploadProgressBar />} />
+          <Route path="/teacher" element={<Placeholder title="Teacher Panel" />} />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  )
+      </main>
+      <Footer />
+    </BrowserRouter>
+  );
 }
