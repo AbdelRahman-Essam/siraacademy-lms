@@ -51,7 +51,7 @@ const courseSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     thumbnailUrl: { type: String, default: "" },
     promoVideoUrl: { type: String, default: "" },
-    price: { type: Number, default: 0 },
+    price: { type: Number, default: 0, min: 0 },
     discountPercent: { type: Number, default: 0, min: 0, max: 100 },
     // Admin-provided top-level Drive folder for this course; lesson subfolders live inside it.
     driveFolderId: { type: String, default: "" },

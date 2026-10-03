@@ -16,6 +16,8 @@ router.get("/drive/oauth/callback", driveOAuth.callback);
 
 router.use(requireAuth, admin); // everything below is admin-only
 
+router.get("/courses", c.listCourses);
+router.get("/courses/:id", c.getCourse);
 router.post("/courses", c.createCourse);
 router.put("/courses/:id", c.updateCourse);
 router.delete("/courses/:id", c.deleteCourse);

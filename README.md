@@ -26,6 +26,13 @@ zip) — read that alongside this README.
 - **Added:** the Google OAuth consent flow that was the biggest flagged gap — `GET /api/admin/drive/oauth/start` and `/callback` (`controllers/driveOAuth.controller.js`), so an admin can actually connect a Google account from the UI instead of needing a refresh token obtained some other way. Wired into a "Connect Google account" button on the new Admin page.
 - **Added:** `pages/` — Home, Courses catalog, CourseDetail (lesson list + video + homework), Dashboard (my enrollments), Admin (storage accounts + video upload + enrollment list), Teacher (grading queue), PaymentResult (polls the real payment status rather than trusting the redirect). `App.jsx` now routes to all of them.
 
+## Third pass — course creation finalized (payment intentionally untouched)
+- **Added:** `GET /api/admin/courses` and `GET /api/admin/courses/:id` — full admin-facing course data (pricing, Drive folder/account, every lesson field), separate from the public catalog/student-detail endpoints which strip that out.
+- **Added:** `CourseForm` — create/edit a course with title, description, price, discount % (with a live final-price preview matching the backend's `finalPrice` virtual), thumbnail and promo-video upload, and the Drive folder ID + storage account a course needs before video upload works.
+- **Added:** `LessonManager` — per-course lesson list with inline add/edit/delete, and the video-upload and attachment-upload flows now hang off an actual selected lesson instead of requiring the admin to type in raw Mongo IDs.
+- **Added:** `ADMIN-GUIDE.md` — step-by-step usage guide (connect Drive → create course → add lessons → upload video → enroll students) for whoever runs the admin side day-to-day.
+- Payment/checkout was left exactly as-is this pass, per your instruction — course pricing is captured at creation, but completing an actual purchase still goes through the (separately flagged, not-yet-live-tested) Paymob flow from the second pass. Manual enrollment (`POST /api/admin/enroll`) is the way to get a student into a course for now.
+
 ## Still stubbed or needs real-world testing
 - **`utils/drive.js`** — now reachable end-to-end via the OAuth flow above, but still never run against a real Google account. The CORS-for-direct-browser-download and throttling-under-load questions from the spec still need a hands-on spike.
 - **`utils/paymob.js`** — HMAC field order needs checking against Paymob's current docs before going live. Also: the exact query params Paymob appends to its redirect URL (for `PaymentResultPage` to read `purchaseOrderId` from) need confirming against a real Paymob integration dashboard — `merchant_order_id` was set to the purchase order's id, but this hasn't been tested against a live redirect.

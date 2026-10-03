@@ -13,6 +13,20 @@ const { encrypt } = require("../utils/crypto");
 
 // ---- Courses & Lessons ----
 
+// Full admin view — unlike the public catalog/student detail, this includes
+// pricing, Drive folder/account wiring, and every lesson field so the admin
+// UI has everything it needs to edit.
+async function listCourses(req, res) {
+  const courses = await Course.find().populate("storageAccount", "label ownerEmail");
+  res.json(courses);
+}
+
+async function getCourse(req, res) {
+  const course = await Course.findById(req.params.id).populate("storageAccount", "label ownerEmail");
+  if (!course) return res.status(404).json({ detail: "Course not found." });
+  res.json(course);
+}
+
 async function createCourse(req, res) {
   const course = await Course.create(req.body);
   res.status(201).json(course);
@@ -189,6 +203,7 @@ async function unenroll(req, res) {
 }
 
 module.exports = {
+  listCourses, getCourse,
   createCourse, updateCourse, deleteCourse,
   addLesson, updateLesson, deleteLesson,
   uploadMedia, addAttachment, deleteAttachment,
