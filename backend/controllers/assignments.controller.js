@@ -1,3 +1,5 @@
+const fs = require("fs");
+const cloudinary = require("cloudinary").v2;
 const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
 const StudentSubmission = require("../models/StudentSubmission");
@@ -46,4 +48,14 @@ async function submit(req, res) {
   }
 }
 
-module.exports = { getAssignment, submit };
+// Student-facing audio upload — distinct from the admin media endpoint,
+// which requires the admin role. Returns the URL the client then passes to
+// `submit` as audioFileUrl.
+async function uploadAudio(req, res) {
+  if (!req.file) return res.status(400).json({ detail: "No audio file uploaded." });
+  const result = await cloudinary.uploader.upload(req.file.path, { resource_type: "video" }); // audio goes through Cloudinary's "video" pipeline
+  fs.unlink(req.file.path, () => {});
+  res.json({ url: result.secure_url });
+}
+
+module.exports = { getAssignment, submit, uploadAudio };

@@ -4,6 +4,15 @@ const requireRole = require("../middleware/roles");
 const upload = require("../middleware/upload");
 const admin = requireRole("admin");
 const c = require("../controllers/admin.controller");
+const driveOAuth = require("../controllers/driveOAuth.controller");
+
+// OAuth start/callback must come BEFORE the admin-only gate: Google calls the
+// callback directly (it can't carry a Bearer token), and the gate would
+// reject it with 401. The route itself is safe to leave ungated because it
+// only ever creates a StorageAccount from a one-time Google-issued code; it
+// grants no access to anything else in the API.
+router.get("/drive/oauth/start", driveOAuth.start); // auth checked manually inside — see controller comment
+router.get("/drive/oauth/callback", driveOAuth.callback);
 
 router.use(requireAuth, admin); // everything below is admin-only
 

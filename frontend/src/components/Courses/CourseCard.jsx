@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { enrollInCourse } from "../../Redux/enrollmentSlice";
 import { startCheckout } from "../../Redux/paymentSlice";
@@ -10,7 +11,7 @@ export default function CourseCard({ course }) {
     <div className="paper-card overflow-hidden">
       {course.thumbnailUrl && <img src={course.thumbnailUrl} alt="" className="w-full h-40 object-cover" />}
       <div className="p-4">
-        <h3 className="text-lg">{course.title}</h3>
+        <Link to={`/courses/${course.id}`}><h3 className="text-lg hover:text-brand">{course.title}</h3></Link>
         <p className="text-sm text-ink/70 mt-1 line-clamp-2">{course.description}</p>
         <p className="text-xs text-ink/50 mt-2">{course.lessonCount} lessons</p>
         <button

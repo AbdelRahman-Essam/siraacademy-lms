@@ -1,4 +1,5 @@
 const Course = require("../models/Course");
+const User = require("../models/User");
 const PurchaseOrder = require("../models/PurchaseOrder");
 const Enrollment = require("../models/Enrollment");
 const paymob = require("../utils/paymob");
@@ -21,8 +22,9 @@ async function checkout(req, res) {
   order.paymobOrderId = String(paymobOrder.id);
   await order.save();
 
+  const buyer = await User.findById(req.user.id).select("email username");
   const paymentKey = await paymob.requestPaymentKey(authToken, paymobOrder, amountCents, {
-    email: req.user.email || "student@example.com", first_name: "Student", last_name: "Student",
+    email: buyer.email, first_name: buyer.username, last_name: buyer.username,
     phone_number: "+20000000000", apartment: "NA", floor: "NA", street: "NA", building: "NA",
     shipping_method: "NA", postal_code: "NA", city: "NA", country: "NA", state: "NA",
   });
