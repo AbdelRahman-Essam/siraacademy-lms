@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const Users = require("../models/users");
 const { signAccessToken, signRefreshToken } = require("../utils/jwt");
 
 async function register(req, res) {
@@ -8,11 +8,18 @@ async function register(req, res) {
   if (!username || !email || !password) {
     return res.status(400).json({ detail: "username, email and password are required." });
   }
-  const exists = await User.findOne({ $or: [{ username }, { email }] });
+  const exists = await Users.findByUsernameOrEmail(username, email);
   if (exists) return res.status(400).json({ detail: "Username or email already in use." });
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({ username, email, passwordHash, role: "student" });
+  let user;
+  try {
+    user = await Users.create({ username, email, passwordHash, role: "student" });
+  } catch (err) {
+    // Two simultaneous registrations can both pass the check above; the unique constraint settles it.
+    if (err.code === "23505") return res.status(400).json({ detail: "Username or email already in use." });
+    throw err;
+  }
   return res.status(201).json({
     access: signAccessToken(user),
     refresh: signRefreshToken(user),
@@ -22,7 +29,7 @@ async function register(req, res) {
 
 async function login(req, res) {
   const { username, password } = req.body;
-  const user = await User.findOne({ username });
+  const user = await Users.findByUsername(username);
   if (!user) return res.status(401).json({ detail: "Invalid credentials." });
 
   const ok = await bcrypt.compare(password, user.passwordHash);
@@ -40,7 +47,7 @@ async function refresh(req, res) {
   if (!refreshToken) return res.status(400).json({ detail: "refresh token required." });
   try {
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    const user = await User.findById(payload.sub);
+    const user = await Users.findById(payload.sub);
     if (!user) return res.status(401).json({ detail: "Invalid refresh token." });
     return res.json({ access: signAccessToken(user) });
   } catch {

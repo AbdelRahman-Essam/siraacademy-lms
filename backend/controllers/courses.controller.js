@@ -1,12 +1,10 @@
-const Course = require("../models/Course");
-const Enrollment = require("../models/Enrollment");
+const Courses = require("../models/courses");
+const Enrollments = require("../models/enrollments");
 
 // Public catalog — the main "Courses" browse page. Strips admin-only fields
 // (encryption keys, drive folder ids) before sending to the client.
 async function catalog(req, res) {
-  const courses = await Course.find().select(
-    "title description thumbnailUrl promoVideoUrl price discountPercent lessons.title lessons.order"
-  );
+  const courses = await Courses.catalog();
   const shaped = courses.map((c) => ({
     id: c._id,
     title: c.title,
@@ -15,7 +13,7 @@ async function catalog(req, res) {
     promoVideoUrl: c.promoVideoUrl,
     price: c.price,
     finalPrice: c.finalPrice,
-    lessonCount: c.lessons.length,
+    lessonCount: c.lessonCount,
   }));
   res.json(shaped);
 }
@@ -25,12 +23,12 @@ async function catalog(req, res) {
 // Video content_url/encryption fields are NEVER sent here; only the video
 // token endpoint (lessons.controller) hands those out, and only per-request.
 async function detail(req, res) {
-  const course = await Course.findById(req.params.id);
+  const course = await Courses.getById(req.params.id);
   if (!course) return res.status(404).json({ detail: "Course not found." });
 
   let unlockedUpTo = 0;
   if (req.user?.role === "student") {
-    const enrollment = await Enrollment.findOne({ student: req.user.id, course: course._id });
+    const enrollment = await Enrollments.findOne(req.user.id, course._id);
     unlockedUpTo = enrollment ? enrollment.unlockedLessonOrder : 0;
   } else {
     unlockedUpTo = course.lessons.length; // admin/teacher previewing structure, not content

@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { google } = require("googleapis");
-const StorageAccount = require("../models/StorageAccount");
+const StorageAccounts = require("../models/storageAccounts");
 const { encrypt } = require("../utils/crypto");
 
 // The piece that was missing: an actual way for the admin to connect a real
@@ -66,7 +66,7 @@ async function callback(req, res) {
   const oauth2 = google.oauth2({ version: "v2", auth: client });
   const { data: profile } = await oauth2.userinfo.get();
 
-  const account = await StorageAccount.create({
+  const account = await StorageAccounts.create({
     label,
     ownerEmail: profile.email,
     refreshTokenEnc: encrypt(tokens.refresh_token),

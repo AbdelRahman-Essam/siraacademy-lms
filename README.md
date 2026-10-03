@@ -1,22 +1,22 @@
-# Sira English LMS — Node/Mongo Port (v2)
+# Sira English LMS — Node/Express + PostgreSQL (v3)
 
-Ported from `siraacademy-lms-master` (Django/DRF/PostgreSQL) to Node/Express/MongoDB,
-with the frontend restructured around Sira-lms-2-main's Redux Toolkit + Tailwind 4
+Ported from `siraacademy-lms-master` (Django/DRF/PostgreSQL) to Node/Express, first on MongoDB (v2) and
+now back on **PostgreSQL** (v3) via the `pg` driver (plain SQL, no ORM), with the frontend restructured around Sira-lms-2-main's Redux Toolkit + Tailwind 4
 conventions. Full decision history is in `platform-specification-v2.md` (also in this
 zip) — read that alongside this README.
 
 ## What's implemented and working end-to-end (logic-complete, untested against a real DB/Drive/Paymob)
 - Auth: register/login/refresh with JWT + bcrypt, rate-limited (`backend/controllers/auth.controller.js`)
 - Role-based access control mirroring the original DRF permission classes (`middleware/roles.js`)
-- Course/Lesson schema with embedded lessons/attachments/assignments + top-level Enrollment/PurchaseOrder/StudentSubmission (`backend/models/`)
-- Server-side progressive lesson unlocking (`Enrollment.unlockedLessonOrder`)
+- Relational schema in `backend/db/schema.sql` (users, courses, lessons, lesson_segments, attachments, assignments, enrollments, purchase_orders, student_submissions, storage_accounts) with data-access modules in `backend/models/`
+- Server-side progressive lesson unlocking (`enrollments.unlocked_lesson_order`)
 - Video token → rewritten HLS playlist → per-segment redirect flow, matching the Drive-hybrid design in the spec (`controllers/lessons.controller.js`)
 - Homework module: assignment fetch + final submission, gated by lesson-unlock (`controllers/assignments.controller.js`)
 - Admin dashboard API: course/lesson CRUD, media upload, lesson-video upload pipeline with a live progress tracker, storage-account management, manual enrollment (`controllers/admin.controller.js`)
 - Teacher API: meeting-link-only access, read-only student records, grading (`controllers/teacher.controller.js`)
 - Paymob checkout + HMAC-verified webhook, enrollment created only from the webhook (`controllers/payments.controller.js`, `utils/paymob.js`)
 - Frontend: Redux Toolkit slices per domain, axios client with auto-refresh, Sira English theme ported to Tailwind 4, VideoPlayer (hls.js + watermark), AudioRecorder (MediaRecorder), upload progress bar
-- `scripts/seed_demo.js` — same demo dataset as the original (9 users, 5 courses × 10 lessons, 7 enrollments, graded submissions), rewritten for the embedded Course/Lesson schema. Run with `npm run seed` or `npm run seed -- --reset`.
+- `scripts/seed_demo.js` — same demo dataset as the original (9 users, 5 courses × 10 lessons, 7 enrollments, graded submissions), rewritten for PostgreSQL. Run with `npm run seed` or `npm run seed -- --reset`.
 
 ## Second pass — review fixes + continued porting
 - **Fixed:** `payments.controller.js` was reading `req.user.email`, which the JWT never carries (only `id`/`role`) — every real checkout was silently using a placeholder email. Now looks the buyer up from the DB.
@@ -28,8 +28,8 @@ zip) — read that alongside this README.
 
 ## Third pass — course creation finalized (payment intentionally untouched)
 - **Added:** `GET /api/admin/courses` and `GET /api/admin/courses/:id` — full admin-facing course data (pricing, Drive folder/account, every lesson field), separate from the public catalog/student-detail endpoints which strip that out.
-- **Added:** `CourseForm` — create/edit a course with title, description, price, discount % (with a live final-price preview matching the backend's `finalPrice` virtual), thumbnail and promo-video upload, and the Drive folder ID + storage account a course needs before video upload works.
-- **Added:** `LessonManager` — per-course lesson list with inline add/edit/delete, and the video-upload and attachment-upload flows now hang off an actual selected lesson instead of requiring the admin to type in raw Mongo IDs.
+- **Added:** `CourseForm` — create/edit a course with title, description, price, discount % (with a live final-price preview matching the backend's computed `finalPrice`), thumbnail and promo-video upload, and the Drive folder ID + storage account a course needs before video upload works.
+- **Added:** `LessonManager` — per-course lesson list with inline add/edit/delete, and the video-upload and attachment-upload flows now hang off an actual selected lesson instead of requiring the admin to type in raw database IDs.
 - **Added:** `ADMIN-GUIDE.md` — step-by-step usage guide (connect Drive → create course → add lessons → upload video → enroll students) for whoever runs the admin side day-to-day.
 - Payment/checkout was left exactly as-is this pass, per your instruction — course pricing is captured at creation, but completing an actual purchase still goes through the (separately flagged, not-yet-live-tested) Paymob flow from the second pass. Manual enrollment (`POST /api/admin/enroll`) is the way to get a student into a course for now.
 
@@ -41,9 +41,20 @@ zip) — read that alongside this README.
 - **Teacher meeting-link management & read-only student records UI** — same situation: `/api/teacher/meeting-links` and `/api/teacher/student-records` work, but only the grading queue has a page built for it so far.
 - No test suite yet.
 
+## Fourth pass — MongoDB → PostgreSQL
+- **Changed:** `mongoose` removed, `pg` added. `DATABASE_URL` replaces `MONGO_URI` (set `PGSSL=true` for managed Postgres that requires TLS).
+- **Changed:** embedded lessons/segments/attachments/assignment became their own tables with foreign keys (`ON DELETE CASCADE`), so deleting a course or lesson also removes its enrollments, assignments and submissions instead of leaving orphans.
+- **Changed:** ids are now UUIDs (`gen_random_uuid()`, PostgreSQL 13+) instead of ObjectIds. API responses keep the same shape, including `_id` and nested `lessons`, so the frontend is unchanged.
+- **Added:** `db/schema.sql` (idempotent), applied automatically on server start and via `npm run migrate`.
+- **Added:** PostgreSQL error → HTTP mapping in `middleware/errorHandler.js` (malformed id → 404, missing field / bad value → 400, duplicate → 409).
+- **Tightened:** lesson create/update now only accepts `title`, `order`, `meetingLink` and `assignment` from the request body (previously any field, including `encryptionKey`, could be written).
+- Existing MongoDB data is **not** migrated automatically; re-seed with `npm run seed` or ask for a one-off export/import script.
+
 ## Running it
 ```
-cd backend && npm install && cp .env.example .env   # fill in real secrets
+cd backend && npm install && cp .env.example .env   # fill in real secrets + DATABASE_URL
+createdb sira_academy   # or any empty Postgres database matching DATABASE_URL
+npm run migrate # optional: the server also applies the schema on start
 npm run seed    # optional: populate demo users/courses/enrollments
 npm start        # also set FRONTEND_URL in .env so CORS + the OAuth callback redirect work
 

@@ -1,17 +1,16 @@
 const fs = require("fs");
 const cloudinary = require("cloudinary").v2;
-const Course = require("../models/Course");
-const Enrollment = require("../models/Enrollment");
-const StudentSubmission = require("../models/StudentSubmission");
+const Courses = require("../models/courses");
+const Enrollments = require("../models/enrollments");
+const Submissions = require("../models/submissions");
 
 // Assignment detail — gated by the same lesson-unlock rule as video.
 async function getAssignment(req, res) {
   const { courseId, lessonId } = req.params;
-  const course = await Course.findById(courseId);
-  const lesson = course?.lessons.id(lessonId);
+  const lesson = await Courses.getLesson(courseId, lessonId);
   if (!lesson?.assignment) return res.status(404).json({ detail: "No assignment for this lesson." });
 
-  const enrollment = await Enrollment.findOne({ student: req.user.id, course: courseId });
+  const enrollment = await Enrollments.findOne(req.user.id, courseId);
   if (!enrollment || lesson.order > enrollment.unlockedLessonOrder) {
     return res.status(403).json({ detail: "This lesson is not unlocked for you." });
   }
@@ -20,30 +19,29 @@ async function getAssignment(req, res) {
 
 // Final submission only — re-recording/preview happens entirely client-side
 // before this is ever called. One submission per (student, assignment); a
-// second call is rejected by the unique index, matching "locks on submit".
+// second call is rejected by the unique constraint, matching "locks on submit".
 async function submit(req, res) {
   const { courseId, lessonId } = req.params;
   const { audioFileUrl } = req.body; // uploaded via multer in the route, url passed in
-  const course = await Course.findById(courseId);
-  const lesson = course?.lessons.id(lessonId);
+  const lesson = await Courses.getLesson(courseId, lessonId);
   if (!lesson?.assignment) return res.status(404).json({ detail: "No assignment for this lesson." });
 
-  const enrollment = await Enrollment.findOne({ student: req.user.id, course: courseId });
+  const enrollment = await Enrollments.findOne(req.user.id, courseId);
   if (!enrollment || lesson.order > enrollment.unlockedLessonOrder) {
     return res.status(403).json({ detail: "This lesson is not unlocked for you." });
   }
 
   try {
-    const submission = await StudentSubmission.create({
-      student: req.user.id,
-      course: courseId,
+    const submission = await Submissions.create({
+      studentId: req.user.id,
+      courseId,
       lessonId,
       assignmentId: lesson.assignment._id,
       audioFileUrl,
     });
     res.status(201).json(submission);
   } catch (err) {
-    if (err.code === 11000) return res.status(400).json({ detail: "You've already submitted this assignment." });
+    if (err.code === "23505") return res.status(400).json({ detail: "You've already submitted this assignment." });
     throw err;
   }
 }

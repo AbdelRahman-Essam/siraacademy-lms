@@ -1,21 +1,18 @@
 // Node port of the original Django `seed_demo` management command.
 // Same demo dataset (users, 5 courses x 10 lessons, enrollments, assignments,
-// graded submissions) — adapted to the new embedded Course/Lesson schema and
-// the top-level Enrollment/StudentSubmission collections (see
-// platform-specification-v2.md section 5 for why those stayed separate).
+// graded submissions), now written against PostgreSQL.
 //
 // Usage:
 //   npm run seed            # create/update demo data
 //   npm run seed -- --reset # delete demo data first, then recreate
 
 require("dotenv").config();
-const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const connectDB = require("../config/db");
-const User = require("../models/User");
-const Course = require("../models/Course");
-const Enrollment = require("../models/Enrollment");
-const StudentSubmission = require("../models/StudentSubmission");
+const Users = require("../models/users");
+const Enrollments = require("../models/enrollments");
+const Submissions = require("../models/submissions");
+const q = connectDB.query;
 
 const RESET = process.argv.includes("--reset");
 
@@ -81,78 +78,83 @@ async function run() {
 
   if (RESET) {
     console.log("Removing demo data...");
-    await StudentSubmission.deleteMany({});
-    await Enrollment.deleteMany({});
-    await Course.deleteMany({ title: { $in: Object.keys(COURSES) } });
-    await User.deleteMany({ username: { $in: DEMO_USERNAMES } });
+    await q("DELETE FROM student_submissions");
+    await q("DELETE FROM enrollments");
+    await q("DELETE FROM courses WHERE title = ANY($1)", [Object.keys(COURSES)]); // lessons cascade
+    await q("DELETE FROM users WHERE username = ANY($1)", [DEMO_USERNAMES]);
   }
 
   console.log("Creating users...");
   const userByUsername = {};
   for (const u of USERS) {
-    let user = await User.findOne({ username: u.username });
+    let user = await Users.findByUsername(u.username);
     if (!user) {
       const passwordHash = await bcrypt.hash(u.password, 10);
-      user = await User.create({ username: u.username, email: u.email, passwordHash, role: u.role });
+      user = await Users.create({ username: u.username, email: u.email, passwordHash, role: u.role });
       console.log(`  created ${u.username}`);
     }
     userByUsername[u.username] = user;
   }
 
   console.log("Creating courses...");
-  const courseByTitle = {};
+  const courseIdByTitle = {};
   for (const [title, lessonTitles] of Object.entries(COURSES)) {
-    let course = await Course.findOne({ title });
-    if (!course) {
-      const lessons = lessonTitles.map((lessonTitle, i) => ({
-        title: lessonTitle,
-        order: i + 1,
-        meetingLink: "https://meet.google.com/demo-class",
-        encryptionKeyId: "demo-key-id",
-        encryptionKey: "demo-encryption-key",
-        segments: [],
-        attachments: [],
-        assignment: { audioPromptUrl: "demo://prompt.txt", instructions: INSTRUCTIONS[i % INSTRUCTIONS.length] },
-      }));
-      course = await Course.create({
-        title,
-        description: `${title} course for Sira English Academy.`,
-        lessons,
-      });
-      console.log(`  created ${title} (${lessons.length} lessons)`);
+    const existing = await q("SELECT id FROM courses WHERE title = $1 LIMIT 1", [title]);
+    if (existing.rows[0]) {
+      courseIdByTitle[title] = existing.rows[0].id;
+      continue;
     }
-    courseByTitle[title] = course;
+    const { rows } = await q("INSERT INTO courses (title, description) VALUES ($1, $2) RETURNING id", [
+      title,
+      `${title} course for Sira English Academy.`,
+    ]);
+    const courseId = rows[0].id;
+    for (let i = 0; i < lessonTitles.length; i++) {
+      const lesson = await q(
+        `INSERT INTO lessons (course_id, title, lesson_order, meeting_link, encryption_key_id, encryption_key)
+         VALUES ($1, $2, $3, 'https://meet.google.com/demo-class', 'demo-key-id', 'demo-encryption-key')
+         RETURNING id`,
+        [courseId, lessonTitles[i], i + 1]
+      );
+      await q("INSERT INTO assignments (lesson_id, audio_prompt_url, instructions) VALUES ($1, 'demo://prompt.txt', $2)", [
+        lesson.rows[0].id,
+        INSTRUCTIONS[i % INSTRUCTIONS.length],
+      ]);
+    }
+    courseIdByTitle[title] = courseId;
+    console.log(`  created ${title} (${lessonTitles.length} lessons)`);
   }
 
   console.log("Creating enrollments...");
-  const enrollmentDocs = [];
+  const enrollments = [];
   for (const e of ENROLLMENTS) {
-    const doc = await Enrollment.findOneAndUpdate(
-      { student: userByUsername[e.username]._id, course: courseByTitle[e.course]._id },
-      { $setOnInsert: { source: "admin", unlockedLessonOrder: e.unlockedLessonOrder } },
-      { upsert: true, new: true }
+    enrollments.push(
+      await Enrollments.ensure(userByUsername[e.username]._id, courseIdByTitle[e.course], {
+        source: "admin",
+        unlockedLessonOrder: e.unlockedLessonOrder,
+      })
     );
-    enrollmentDocs.push(doc);
   }
-  console.log(`  ${enrollmentDocs.length} enrollments ready`);
+  console.log(`  ${enrollments.length} enrollments ready`);
 
   console.log("Creating graded student submissions...");
   let submissionCount = 0;
-  for (const enrollment of enrollmentDocs) {
-    const course = await Course.findById(enrollment.course);
-    const unlockedLessons = course.lessons
-      .filter((l) => l.order <= enrollment.unlockedLessonOrder)
-      .sort((a, b) => a.order - b.order);
+  for (const enrollment of enrollments) {
+    const { rows: unlocked } = await q(
+      `SELECT l.id AS lesson_id, a.id AS assignment_id
+         FROM lessons l JOIN assignments a ON a.lesson_id = l.id
+        WHERE l.course_id = $1 AND l.lesson_order <= $2
+        ORDER BY l.lesson_order`,
+      [enrollment.course, enrollment.unlockedLessonOrder]
+    );
 
-    for (let i = 0; i < unlockedLessons.length; i++) {
-      const lesson = unlockedLessons[i];
-      if (!lesson.assignment) continue;
+    for (let i = 0; i < unlocked.length; i++) {
       try {
-        await StudentSubmission.create({
-          student: enrollment.student,
-          course: course._id,
-          lessonId: lesson._id,
-          assignmentId: lesson.assignment._id,
+        await Submissions.create({
+          studentId: enrollment.student,
+          courseId: enrollment.course,
+          lessonId: unlocked[i].lesson_id,
+          assignmentId: unlocked[i].assignment_id,
           audioFileUrl: "demo://submission.txt",
           status: "graded",
           teacherFeedback: FEEDBACK[i % FEEDBACK.length],
@@ -160,17 +162,18 @@ async function run() {
         });
         submissionCount++;
       } catch (err) {
-        if (err.code !== 11000) throw err; // already submitted — fine on re-run
+        if (err.code !== "23505") throw err; // already submitted — fine on re-run
       }
     }
   }
 
+  const scalar = async (sql) => (await q(sql)).rows[0].n;
   const counts = {
-    users: await User.countDocuments(),
-    courses: await Course.countDocuments(),
-    lessons: (await Course.find().select("lessons")).reduce((sum, c) => sum + c.lessons.length, 0),
-    enrollments: await Enrollment.countDocuments(),
-    submissions: await StudentSubmission.countDocuments(),
+    users: await Users.count(),
+    courses: await scalar("SELECT count(*)::int AS n FROM courses"),
+    lessons: await scalar("SELECT count(*)::int AS n FROM lessons"),
+    enrollments: await scalar("SELECT count(*)::int AS n FROM enrollments"),
+    submissions: await Submissions.count(),
   };
 
   console.log("");
@@ -184,7 +187,7 @@ async function run() {
   console.log(`Submissions   : ${counts.submissions} (${submissionCount} created this run)`);
   console.log("=".repeat(60));
 
-  await mongoose.disconnect();
+  await connectDB.pool.end();
 }
 
 run().catch((err) => {

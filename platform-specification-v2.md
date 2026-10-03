@@ -1,3 +1,5 @@
+> **Update (v3):** the database has since moved from MongoDB back to PostgreSQL (plain SQL via `pg`). References to MongoDB/Mongoose and embedded subdocuments below describe the v2 design; the current schema is `backend/db/schema.sql` and the README's "Fourth pass" section lists what changed.
+
 # Sira English — E-Learning Platform Specification (v2: Node/Mongo Migration)
 
 **Academy:** Sira English (logo: navy laurel-wreath emblem, serif wordmark)

@@ -1,18 +1,17 @@
-const Course = require("../models/Course");
-const Enrollment = require("../models/Enrollment");
-const StorageAccount = require("../models/StorageAccount");
+const Courses = require("../models/courses");
+const Enrollments = require("../models/enrollments");
+const StorageAccounts = require("../models/storageAccounts");
 const { signVideoToken, verifyVideoToken } = require("../utils/jwt");
 const { getSignedSegmentUrl } = require("../utils/drive");
 
 async function findLesson(courseId, lessonId) {
-  const course = await Course.findById(courseId);
-  if (!course) return {};
-  const lesson = course.lessons.id(lessonId);
-  return { course, lesson };
+  const lesson = await Courses.getLesson(courseId, lessonId);
+  if (!lesson) return {};
+  return { course: { _id: courseId }, lesson };
 }
 
 async function assertUnlocked(studentId, course, lesson) {
-  const enrollment = await Enrollment.findOne({ student: studentId, course: course._id });
+  const enrollment = await Enrollments.findOne(studentId, course._id);
   if (!enrollment) return false;
   return lesson.order <= enrollment.unlockedLessonOrder;
 }
@@ -46,8 +45,8 @@ async function getPlaylist(req, res) {
     return res.status(403).json({ detail: "Token does not match this lesson." });
   }
 
-  const course = await Course.findOne({ "lessons._id": req.params.lessonId });
-  const lesson = course?.lessons.id(req.params.lessonId);
+  const ctx = await Courses.findLessonContext(req.params.lessonId);
+  const lesson = ctx?.lesson;
   if (!lesson) return res.status(404).json({ detail: "Lesson not found." });
 
   const lines = ["#EXTM3U", "#EXT-X-VERSION:3", "#EXT-X-TARGETDURATION:10"];
@@ -77,12 +76,11 @@ async function getSegment(req, res) {
   }
   if (payload.lessonId !== lessonId) return res.status(403).json({ detail: "Token mismatch." });
 
-  const course = await Course.findOne({ "lessons._id": lessonId });
-  const lesson = course?.lessons.id(lessonId);
-  const segment = lesson?.segments.find((s) => String(s.index) === String(index));
+  const ctx = await Courses.findLessonContext(lessonId);
+  const segment = ctx?.lesson.segments.find((s) => String(s.index) === String(index));
   if (!segment) return res.status(404).json({ detail: "Segment not found." });
 
-  const storageAccount = await StorageAccount.findById(course.storageAccount);
+  const storageAccount = await StorageAccounts.findById(ctx.course.storageAccount);
   const url = await getSignedSegmentUrl(storageAccount, segment.driveFileId);
   res.redirect(302, url);
 }
